@@ -3,9 +3,22 @@
 	import type { IFlow, TFlowRepeat, TFlowType } from '$lib/types/flow';
 	import { getTotalFlowPerMonth, getTotalFlowPerYear } from '$lib/utils/flow';
 	import { formatCurrency } from '$lib/utils/currency';
-	import { toNumericDate, toLongDate } from '$lib/utils/date';
 	import { get, store } from '$lib/utils/storage';
 	import { onMount } from 'svelte';
+	import {
+		sortFlowByAmount,
+		sortFlowByName,
+		sortFlowByType,
+		sortFlowByRepeat
+	} from '$lib/utils/sort';
+	import type { TSortBy } from '$lib/types/sort';
+
+	const sortOptions = [
+		{ value: 'amount', label: 'Jumlah' },
+		{ value: 'name', label: 'Nama' },
+		{ value: 'type', label: 'Tipe' },
+		{ value: 'repeat', label: 'Periode' }
+	];
 
 	const repeatOptions = [
 		{ value: 'daily', label: 'Harian' },
@@ -14,39 +27,100 @@
 		{ value: 'yearly', label: 'Tahunan' }
 	];
 
-	let newFlowName = '';
-	let newFlowAmount = 0;
-	let newFlowType: TFlowType = 'in';
-	let newFlowRepeat: TFlowRepeat = 'daily';
-	let newFlowStartAt = toNumericDate(new Date());
-	let newFlowEndAt = toNumericDate(new Date());
+	let deletedFlow: IFlow | null = null;
+	let editedFlow: IFlow | null = null;
+	let formFlowName = '';
+	let formFlowAmount = 0;
+	let formFlowType: TFlowType = 'in';
+	let formFlowRepeat: TFlowRepeat = 'daily';
 
 	onMount(() => {
 		$flows = get('flows') || [];
 	});
 
-	function addFlow() {
-		const newFlow = {
-			name: newFlowName,
-			amount: newFlowAmount,
-			type: newFlowType,
-			startAt: newFlowStartAt.toString(),
-			endAt: newFlowEndAt.toString(),
-			repeat: newFlowRepeat
-		};
-
-		flows.update((flows) => [...flows, newFlow]);
-		store('flows', $flows);
-
-		newFlowName = '';
-		newFlowAmount = 0;
-		newFlowRepeat = 'daily';
-		newFlowStartAt = toNumericDate(new Date());
-		newFlowEndAt = toNumericDate(new Date());
+	function sortFlows(e: Event) {
+		const sortBy = (e.target as HTMLSelectElement).value as TSortBy;
+		$flows = $flows.sort((a, b) => {
+			switch (sortBy) {
+				case 'amount':
+					return sortFlowByAmount(a, b);
+				case 'name':
+					return sortFlowByName(a, b);
+				case 'type':
+					return sortFlowByType(a, b);
+				case 'repeat':
+					return sortFlowByRepeat(a, b);
+				default:
+					return 0;
+			}
+		});
 	}
 
-	function deleteFlow(flow: IFlow) {
-		$flows = $flows.filter((b) => b !== flow);
+	function chooseEditFlow(flow: IFlow) {
+		editedFlow = flow;
+		formFlowName = flow.name;
+		formFlowAmount = flow.amount;
+		formFlowType = flow.type;
+		formFlowRepeat = flow.repeat;
+	}
+
+	function cancelEditFlow() {
+		editedFlow = null;
+		formFlowName = '';
+		formFlowAmount = 0;
+		formFlowRepeat = 'daily';
+	}
+
+	function editFlow() {
+		const formFlow = {
+			name: formFlowName,
+			amount: formFlowAmount,
+			type: formFlowType,
+			repeat: formFlowRepeat,
+			isActive: true
+		};
+
+		$flows = $flows.map((f) => (f === editedFlow ? formFlow : f));
+		store('flows', $flows);
+
+		editedFlow = null;
+		formFlowName = '';
+		formFlowAmount = 0;
+		formFlowRepeat = 'daily';
+	}
+
+	function addFlow() {
+		const formFlow = {
+			name: formFlowName,
+			amount: formFlowAmount,
+			type: formFlowType,
+			repeat: formFlowRepeat,
+			isActive: true
+		};
+
+		flows.update((flows) => [...flows, formFlow]);
+		store('flows', $flows);
+
+		formFlowName = '';
+		formFlowAmount = 0;
+		formFlowRepeat = 'daily';
+	}
+
+	function toggleFlow(flow: IFlow) {
+		$flows = $flows.map((f) => (f === flow ? { ...f, isActive: !f.isActive } : f));
+		store('flows', $flows);
+	}
+
+	function chooseDeleteFlow(flow: IFlow) {
+		deletedFlow = flow;
+	}
+
+	function cancelDeleteFlow() {
+		deletedFlow = null;
+	}
+
+	function deleteFlow() {
+		$flows = $flows.filter((f) => f !== deletedFlow);
 		store('flows', $flows);
 	}
 </script>
@@ -63,43 +137,76 @@
 	<p>Penghasilan/Tahun: {formatCurrency(getTotalFlowPerYear($flows, null))}</p>
 
 	<section class="mt-4 border p-4">
-		<h2>Catatan Keuangan</h2>
-		{#if $flows.length === 0}
-			<p>Tidak ada catatan</p>
-		{/if}
-		{#each $flows as flow (flow.name + flow.type)}
-			<div class="mb-2 border p-2">
-				<p>{flow.name}: {formatCurrency(flow.amount)}</p>
-				<p>{flow.type === 'out' ? 'Pengeluaran' : 'Penghasilan'}: <i>{flow.repeat}</i></p>
-				<p>Dari <b>{toLongDate(flow.startAt)}</b> hingga <b>{toLongDate(flow.endAt)}</b></p>
-				<button on:click={() => deleteFlow(flow)}>Hapus</button>
+		<div class="mb-4 flex items-start justify-between">
+			<h2>Catatan Keuangan</h2>
+			<div class="flex items-center gap-2">
+				{#if deletedFlow}
+					<button on:click={deleteFlow}>Yakin untuk menghapus?</button>
+					<button on:click={cancelDeleteFlow}>Batal</button>
+				{/if}
+
+				<select on:change={sortFlows}>
+					<option value="">Urutkan</option>
+					{#each sortOptions as option}
+						<option value={option.value}>{option.label}</option>
+					{/each}
+				</select>
 			</div>
-		{/each}
+		</div>
+
+		<div class="flex flex-wrap gap-2">
+			{#if $flows.length === 0}
+				<p>Tidak ada catatan</p>
+			{/if}
+			{#each $flows as flow (flow.name + flow.type)}
+				<div class="mb-2 border p-2 {flow.isActive ? '' : 'bg-gray-200'}">
+					<p><b>{flow.name}</b>: {formatCurrency(flow.amount)}</p>
+					<p><b>{flow.type === 'out' ? 'Pengeluaran' : 'Penghasilan'}:</b> <i>{flow.repeat}</i></p>
+					<div class="mt-2 flex items-center gap-2">
+						<button on:click={() => chooseEditFlow(flow)}>Edit</button>
+						<button on:click={() => chooseDeleteFlow(flow)}>Hapus</button>
+						<button on:click={() => toggleFlow(flow)}>
+							{flow.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+						</button>
+					</div>
+				</div>
+			{/each}
+		</div>
 	</section>
 
 	<section class="mt-4 border p-4">
-		<h2>Tambah Pengeluaran/Penghasilan Berulang</h2>
-		<div class="flex flex-col items-start gap-2">
-			<input type="text" bind:value={newFlowName} placeholder="Nama" />
-			<input type="number" bind:value={newFlowAmount} placeholder="Jumlah" />
-			<div class="flex gap-4">
-				<label for="outflow">
-					<input type="radio" id="outflow" bind:group={newFlowType} value="outflow" />
-					Pengeluaran
-				</label>
-				<label for="inflow">
-					<input type="radio" id="inflow" bind:group={newFlowType} value="inflow" />
-					Penghasilan
-				</label>
+		<h2>
+			{editedFlow ? 'Edit' : 'Tambah'}
+			Pengeluaran/Penghasilan Berulang
+		</h2>
+		<div class="flex flex-col items-start gap-4">
+			<div class="flex flex-wrap gap-4">
+				<input type="text" bind:value={formFlowName} placeholder="Nama" />
+				<input type="number" bind:value={formFlowAmount} placeholder="Jumlah" />
+				<div class="flex gap-4">
+					<label for="outflow">
+						<input type="radio" id="outflow" bind:group={formFlowType} value="out" />
+						Pengeluaran
+					</label>
+					<label for="inflow">
+						<input type="radio" id="inflow" bind:group={formFlowType} value="in" />
+						Penghasilan
+					</label>
+				</div>
+				<select bind:value={formFlowRepeat}>
+					{#each repeatOptions as option}
+						<option value={option.value}>{option.label}</option>
+					{/each}
+				</select>
 			</div>
-			<select bind:value={newFlowRepeat}>
-				{#each repeatOptions as option}
-					<option value={option.value}>{option.label}</option>
-				{/each}
-			</select>
-			<input type="date" bind:value={newFlowStartAt} />
-			<input type="date" bind:value={newFlowEndAt} />
-			<button on:click={addFlow}>Tambah</button>
+			<div class="flex items-center gap-2">
+				{#if editedFlow}
+					<button on:click={editFlow}>Edit Catatan</button>
+					<button on:click={cancelEditFlow}>Batal</button>
+				{:else}
+					<button on:click={addFlow}>Tambah Catatan</button>
+				{/if}
+			</div>
 		</div>
 	</section>
 </main>

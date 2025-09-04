@@ -2,6 +2,8 @@ import type { IFlow, TFlowType } from '$lib/types/flow';
 
 export function getTotalFlowPerMonth(flows: IFlow[], type: TFlowType | null): number {
 	return flows.reduce((total, flow) => {
+		if (!flow.isActive) return total;
+
 		let amount = 0;
 		if (type === null) amount = flow.type === 'in' ? flow.amount : -flow.amount;
 		else amount = flow.type === type ? flow.amount : 0;
@@ -21,6 +23,8 @@ export function getTotalFlowPerMonth(flows: IFlow[], type: TFlowType | null): nu
 
 export function getTotalFlowPerYear(flows: IFlow[], type: TFlowType | null): number {
 	return flows.reduce((total, flow) => {
+		if (!flow.isActive) return total;
+
 		let amount = 0;
 		if (type === null) amount = flow.type === 'in' ? flow.amount : -flow.amount;
 		else amount = flow.type === type ? flow.amount : 0;

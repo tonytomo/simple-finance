@@ -2,9 +2,8 @@ export interface IFlow {
 	name: string;
 	amount: number;
 	type: TFlowType;
-	startAt: string;
-	endAt: string;
 	repeat: TFlowRepeat;
+	isActive: boolean;
 }
 
 export type TFlowType = 'in' | 'out';
