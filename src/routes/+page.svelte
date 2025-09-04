@@ -125,6 +125,11 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Atur Keuangan Anda</title>
+	<meta name="description" content="Aplikasi untuk mengatur keuangan Anda" />
+</svelte:head>
+
 <main
 	class="min-h-screen bg-slate-100 p-4 font-sans text-slate-800 sm:p-6 lg:p-8 dark:bg-slate-900 dark:text-slate-200"
 >
